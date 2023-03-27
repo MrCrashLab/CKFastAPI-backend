@@ -76,8 +76,8 @@ async def get_parkings() -> list[Parking]:
     )
     return [(Parking(id=p.id, id_point=p.id_point, name=p.name, description=p.description, address=p.address, all_slot=p.all_slot, free_slot=p.free_slot)) for p in await database.fetch_all(query)]
 
-@app.get("/parkings/{longitude}/{latitude}")
-async def get_parking(latitude: float, longitude: float):
+@app.get("/parkings/{point_id}")
+async def get_parking(point_id: int):
     query = (
         select(
             [
@@ -91,9 +91,15 @@ async def get_parking(latitude: float, longitude: float):
             ]   
         )
         .select_from(parking_table.join(point_table))
-        .where(point_table.c.latitude == latitude and point_table.c.longitude == longitude)
+        .where(point_table.c.id == point_id)
     )
-    return [(Parking(id=p.id, id_point=p.id_point, name=p.name, description=p.description, address=p.address, all_slot=p.all_slot, free_slot=p.free_slot)) for p in await database.fetch_all(query)]
+    p = await database.fetch_one(query)
+    if p != None:
+        return Parking(id=p.id, id_point=p.id_point, name=p.name, description=p.description, address=p.address, all_slot=p.all_slot, free_slot=p.free_slot)
+    else:
+        return None
+
+
 
 @app.post("/parkings", response_model=Parking)
 async def create_parking(parking: Parking):
