@@ -6,8 +6,8 @@ import configparser
 import databases
 
 sys.path.append('/Users/buenajen/pet_project/CKFastAPI-backend/src')
-from model.api_models import Parking
-from model.sql_models import parking_table
+from model.api_models import Point, Parking
+from model.sql_models import point_table, parking_table
 
 
 config = configparser.ConfigParser()
@@ -28,32 +28,84 @@ async def startup():
 async def shutdown():
     await database.disconnect()
 
+@app.get("/points", response_model=list[Point])
+async def get_points() -> list[Point]:
+    query = (
+        select(
+            [
+                point_table.c.id,
+                point_table.c.longitude,
+                point_table.c.latitude
+            ]   
+        )
+        .select_from(point_table)
+    )
+    return [(Point(id=p.id, longitude=p.longitude, latitude=p.latitude)) for p in await database.fetch_all(query)]
+
+@app.post("/points", response_model=Point)
+async def create_point(point: Point):
+    parks = await get_points()
+    flag = 1
+    for p in parks:
+        if p.latitude == point.latitude and p.longitude == point.longitude:
+            flag = 0
+    query = (
+        insert(point_table).
+        values(longitude=point.longitude, latitude=point.latitude)
+    )
+    if flag:
+        await database.execute(query)
+    return point
+
+
 @app.get("/parkings", response_model=list[Parking])
-async def get_parking_point() -> list[Parking]:
+async def get_parkings() -> list[Parking]:
     query = (
         select(
             [
                 parking_table.c.id,
-                parking_table.c.longitude,
-                parking_table.c.latitude
+                parking_table.c.id_point,
+                parking_table.c.name,
+                parking_table.c.description,
+                parking_table.c.address,
+                parking_table.c.all_slot,
+                parking_table.c.free_slot
             ]   
         )
         .select_from(parking_table)
     )
-    return [(Parking(id=p.id, longitude=p.longitude, latitude=p.latitude)) for p in await database.fetch_all(query)]
+    return [(Parking(id=p.id, id_point=p.id_point, name=p.name, description=p.description, address=p.address, all_slot=p.all_slot, free_slot=p.free_slot)) for p in await database.fetch_all(query)]
+
+@app.get("/parkings/{longitude}/{latitude}")
+async def get_parking(latitude: float, longitude: float):
+    query = (
+        select(
+            [
+                parking_table.c.id,
+                parking_table.c.id_point,
+                parking_table.c.name,
+                parking_table.c.description,
+                parking_table.c.address,
+                parking_table.c.all_slot,
+                parking_table.c.free_slot
+            ]   
+        )
+        .select_from(parking_table.join(point_table))
+        .where(point_table.c.latitude == latitude and point_table.c.longitude == longitude)
+    )
+    return [(Parking(id=p.id, id_point=p.id_point, name=p.name, description=p.description, address=p.address, all_slot=p.all_slot, free_slot=p.free_slot)) for p in await database.fetch_all(query)]
 
 @app.post("/parkings", response_model=Parking)
 async def create_parking(parking: Parking):
-    parks = await get_parking_point()
+    parks = await get_parkings()
     flag = 1
     for p in parks:
-        if p.latitude == parking.latitude and p.longitude == parking.longitude:
+        if p.id_point == parking.id_point:
             flag = 0
     query = (
         insert(parking_table).
-        values(longitude=parking.longitude, latitude=parking.latitude)
+        values(id=parking.id, id_point=parking.id_point, name=parking.name, description=parking.description, address=parking.address, all_slot=parking.all_slot, free_slot=parking.free_slot)
     )
     if flag:
         await database.execute(query)
     return parking
-    
