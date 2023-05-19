@@ -14,3 +14,9 @@ class Parking(BaseModel):
     address: str
     all_slot: int
     free_slot: int
+
+class Map(BaseModel):
+    id: int
+    id_parking: int
+    floor: int
+    src: str

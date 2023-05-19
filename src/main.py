@@ -6,8 +6,8 @@ import configparser
 import databases
 
 sys.path.append('/Users/buenajen/pet_project/CKFastAPI-backend/src')
-from model.api_models import Point, Parking
-from model.sql_models import point_table, parking_table
+from model.api_models import Point, Parking, Map
+from model.sql_models import point_table, parking_table, map_table
 
 
 config = configparser.ConfigParser()
@@ -76,7 +76,7 @@ async def get_parkings() -> list[Parking]:
     )
     return [(Parking(id=p.id, id_point=p.id_point, name=p.name, description=p.description, address=p.address, all_slot=p.all_slot, free_slot=p.free_slot)) for p in await database.fetch_all(query)]
 
-@app.get("/parkings/{point_id}")
+@app.get("/parkings/{point_id}", response_model=Parking)
 async def get_parking(point_id: int):
     query = (
         select(
@@ -115,3 +115,35 @@ async def create_parking(parking: Parking):
     if flag:
         await database.execute(query)
     return parking
+
+
+@app.get("/map/{parking_id}", response_model=list[Map])
+async def get_map(parking_id: int):
+    query = (
+        select(
+            [
+                map_table.c.id,
+                map_table.c.id_parking,
+                map_table.c.floor,
+                map_table.c.src
+            ]   
+        )
+        .select_from(map_table.join(parking_table))
+        .where(parking_table.c.id == parking_id)
+    )
+    return [Map(id=p.id, id_parking=p.id_parking, floor=p.floor, src=p.src) for p in await database.fetch_all(query)]
+
+@app.post("/map", response_model=Map)
+async def create_parking(map: Map):
+    maps = await get_map(map.id_parking)
+    flag = 1
+    for m in maps:
+        if map.id_parking == m.id_parking and map.floor == m.floor:
+            flag = 0
+    query = (
+        insert(map_table).
+        values(id=map.id, id_parking=map.id_parking, floor=map.floor, src=map.src)
+    )
+    if flag:
+        await database.execute(query)
+    return map
